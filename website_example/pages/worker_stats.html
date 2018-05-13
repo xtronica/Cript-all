@@ -16,10 +16,14 @@
         <h4><i class="fa fa-dashboard"></i>&nbsp; <span tkey="hashRate">Hash Rate</span></h4>
 	<div class="row card">
             <div class="col-sm-6 stats push-up-10">
-                <div><i class="fa fa-tachometer"></i> <span tkey="currentHashRate">Current Hash Rate</span>: <span id="yourHashrateHolder"></span></div>
-                <div><i class="fa fa-clock-o"></i> <span tkey="lastShare">Last Share Submitted</span>: <span id="yourLastShare"></span></div>
-                <div><i class="fa fa-cloud-upload"></i> <span tkey="totalHashes">Total Hashes Submitted</span>: <span id="yourHashes"></span></div>
-            </div>
+                 <div class="yourStats"><i class="fa fa-cloud-upload"></i> Total Good Share Submitted: <span id="yourGoodShare"></span></div>
+            <div><i class="fa fa-tachometer"></i> Current Hash Rate: <span id="yourHashrateHolder"></span></div>
+            <div><i class="fa fa-clock-o"></i> Last Share Submitted: <span id="yourLastShare"></span></div>
+            <div><i class="fa fa-cloud-upload"></i> Total Hashes Submitted: <span id="yourHashes"></span></div>
+            <div class="yourStats"><i class="fa fa-cloud-upload"></i> Total Share Submitted: <span id="yourShare"></span></div>
+            <div class="yourStats"><i class="fa fa-key"></i> Total de blocos desbloqueados: <span id="yourLucky"></span></div>
+            <div class="yourStats"><i class="fa fa-clock-o"></i> &#218;ltimo bloco desbloqueado: <span id="yourLastLucky"></span></div>
+        </div>
             <div class="col-sm-6">
                 <div class="userChart push-up-10" data-chart="user_hashrate">
                     <div class="chart">
@@ -29,12 +33,16 @@
             </div> 
 	</div>
     </div>
-    
+ <center><font color="green"><h3>Payments Ready, Happy Mining!</h3></font color></center>
+
     <!-- Payments -->
     <div class="yourStats push-up-20">
         <h4><i class="fa fa-money"></i>&nbsp; <span tkey="payments">Payments</span></h4>
         <div class="row card">
             <div class="col-sm-6 stats push-up-10">
+                <div class="yourStats"><i class="fa fa-bank"></i><font color="red"> [EN] Set your minimum payout <a href="http://bytecoin.pt/#settings">Here</a></font color></div>
+            <div class="yourStats"><i class="fa fa-bank"></i><font color="red"> [PT] Defina o seu pagamento minimo <a href="http://bytecoin.pt/#settings">Aqui</a></font color></div>
+            <div class="yourStats"><i class="fa fa-bank"></i> Limite m&iacute;nimo de pagamento: <span id="paymentsMinimum"></span></div>
                 <div><i class="fa fa-bank"></i> <span tkey="pendingBalance">Pending Balance</span>: <span id="yourPendingBalance"></span></div>
                 <div><i class="fa fa-money"></i> <span tkey="totalPaid">Total Paid</span>: <span id="yourPaid"></span></div>
                 <div><i class="fa fa-money"></i> <span tkey="payoutEstimate">Current Payout Estimate</span>: <span id="yourPayoutEstimate"></span></div>
@@ -142,6 +150,12 @@ function fetchAddressStats(longpoll){
 
             $('#addressError').hide();
 
+
+            if (data.stats.lastLucky)
+                        $('#yourLastLucky').timeago('update', new Date(parseInt(data.stats.lastLucky) * 1000).toISOString());
+                    else
+                        updateText('yourLastLucky', 'Nunca');
+
             if (data.stats.lastShare) {
                 $('#yourLastShare').timeago('update', new Date(parseInt(data.stats.lastShare) * 1000).toISOString());
             }
@@ -151,8 +165,12 @@ function fetchAddressStats(longpoll){
 
             updateText('yourHashrateHolder', (getReadableHashRateString(data.stats.hashrate) || '0 H') + '/sec');
             updateText('yourHashes', (data.stats.hashes || 0).toString());
+            updateText('paymentsMinimum', getReadableCoins((data.stats.minPayoutLevel), 3));
             updateText('yourPaid', getReadableCoins(data.stats.paid));
             updateText('yourPendingBalance', getReadableCoins(data.stats.balance));
+            updateText('yourShare', (data.stats.shares || 0).toString());
+            updateText('yourLucky', (data.stats.lucky || 0).toString());
+            updateText('yourGoodShare', (data.stats.goodShares || 0).toString());
 
             var userRoundHashes = parseInt(data.stats.roundHashes || 0);
 	    var poolRoundHashes = parseInt(lastStats.pool.roundHashes || 0);
@@ -172,7 +190,7 @@ function fetchAddressStats(longpoll){
 	    var payoutEstimate = Math.round(lastReward * (payoutEstimatePct / 100));
             if (transferFee) payoutEstimate = payoutEstimate - transferFee;
 	    if (payoutEstimate < 0) payoutEstimate = 0;
-	    updateText('yourPayoutEstimate', getReadableCoins(payoutEstimate));
+	    updateText('yourPayoutEstimate', getReadableCoins(payoutEstimate, 4));
 	    
             renderPayments(data.payments);
 	    
@@ -281,7 +299,7 @@ function createCharts(data) {
     if (data.hasOwnProperty("charts")) {
         var graphData = {
             hashrate: getGraphData(data.charts.hashrate),
-            payments: getGraphData(data.charts.payments, true)
+            payments: getGraphData(data.charts.payments)
         };
 
         for(var graphType in graphData) {
@@ -305,7 +323,7 @@ function getGraphData(rawData, fixValueToCoins) {
     if(rawData) {
         for (var i = 0, xy; xy = rawData[i]; i++) {
             graphData.names.push(new Date(xy[0]*1000).toLocaleString());
-            graphData.values.push(fixValueToCoins ? getReadableCoins(xy[1], null, true) : xy[1]);
+            graphData.values.push(fixValueToCoins ? getReadableCoins(xy[1], 4, true) : xy[1]);
         }
     }
     
@@ -390,7 +408,6 @@ function renderWorkers(workersData){
 /**
  * Payments report
  **/
-
 // Parse payment data
 function parsePayment(time, serializedPayment){
     var parts = serializedPayment.split(':');
@@ -403,27 +420,22 @@ function parsePayment(time, serializedPayment){
         recipients: parts[4]
     };
 }
-
 // Get payment row element
 function getPaymentRowElement(payment, jsonString){
     var row = document.createElement('tr');
     row.setAttribute('data-json', jsonString);
     row.setAttribute('data-time', payment.time);
     row.setAttribute('id', 'paymentRow' + payment.time);
-
     row.innerHTML = getPaymentCells(payment);
-
     return row;
 }
-
 // Get payment cells
 function getPaymentCells(payment){
     return '<td class="col1">' + formatDate(payment.time) + '</td>' +
            '<td class="col2">' + formatPaymentLink(payment.hash) + '</td>' +
-           '<td class="col3">' + getReadableCoins(payment.amount) + '</td>' +
+           '<td class="col3">' + getReadableCoins(payment.amount, 4, false) + '</td>' +
            '<td class="col4">' + payment.mixin + '</td>';
 }
-
 // Get summary row element
 function getSummaryRowElement(summary, jsonString){
     var row = document.createElement('tr');
@@ -431,22 +443,18 @@ function getSummaryRowElement(summary, jsonString){
     row.setAttribute('data-date', summary.date);
     row.setAttribute('id', 'summaryRow' + summary.date);
     row.setAttribute('class', 'summary');
-
     row.innerHTML = getSummaryCells(summary);
-
     return row;
 }
-
 // Get summary cells
 function getSummaryCells(summary){
     var text = getTranslation('paymentSummaryMulti') ? getTranslation('paymentSummaryMulti') : 'On %DATE% you have received %AMOUNT% in %COUNT% payments';
     if (summary.count <= 1) text = getTranslation('paymentSummarySingle') ? getTranslation('paymentSummarySingle') : 'On %DATE% you have received %AMOUNT%';
     text = text.replace(/%DATE%/g, summary.date);
     text = text.replace(/%COUNT%/g, summary.count);
-    text = text.replace(/%AMOUNT%/g, getReadableCoins(summary.amount));
+    text = text.replace(/%AMOUNT%/g, getReadableCoins(summary.amount, 4, false));
     return '<td colspan="4">' + text + '</td>';
 }
-
 // Render payments
 function renderPayments(paymentsResults){
     var $paymentsRows = $('#paymentsReport_rows');
@@ -456,12 +464,10 @@ function renderPayments(paymentsResults){
         var payment = parsePayment(paymentsResults[i + 1], paymentsResults[i]);
         var paymentJson = JSON.stringify(payment);
         var paymentElement = getPaymentRowElement(payment, paymentJson);
-
         var paymentDate = new Date(parseInt(payment.time) * 1000).toLocaleDateString();
         if (!lastPaymentDate || lastPaymentDate && paymentDate != lastPaymentDate) {
             summaryData = { date: paymentDate, time: payment.time, count: 0, amount: 0 };
         }
-
         var existingRow = document.getElementById('paymentRow' + payment.time);
         if (existingRow && existingRow.getAttribute('data-json') !== paymentJson){
             $(existingRow).replaceWith(getPaymentRowElement(payment, paymentJson));
@@ -487,7 +493,6 @@ function renderPayments(paymentsResults){
 	
         var summaryJson = JSON.stringify(summaryData);
         var summaryElement = getSummaryRowElement(summaryData, summaryJson);
-
         var existingSummary = document.getElementById('summaryRow' + summaryData.date);
         if (existingSummary && existingSummary.getAttribute('data-json') !== summaryJson){
             $(existingSummary).replaceWith(summaryElement);
@@ -510,7 +515,6 @@ function renderPayments(paymentsResults){
         lastPaymentDate = paymentDate;
     }
 }
-
 // Load more payments button
 var xhrGetPayments;
 $('#loadMorePayments').click(function(){
