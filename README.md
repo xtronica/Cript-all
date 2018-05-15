@@ -107,7 +107,6 @@ Community / Support
 * https://graft.anypool.net/
 * https://graft.dark-mine.su/
 * http://itns.proxpool.com/
-* https://bytecoin.pt
 * http://ita.minexmr24.ru/
 * https://pool.croatpirineus.cat
 
@@ -150,7 +149,7 @@ you are using - a good place to start with redis is [data persistence](http://re
 Clone the repository and run `npm update` for all the dependencies to be installed:
 
 ```bash
-git clone https://github.com/avensat/bytecoin-nodejs-pool.git pool
+git clone https://github.com/xtronica/bytecoin-nodejs-pool.git pool
 cd pool
 
 npm update
